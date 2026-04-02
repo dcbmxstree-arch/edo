@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Ecuaciones Diferenciales Autónomas</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --stable: #22c55e;
+            --unstable: #ef4444;
+            --semi: #f59e0b;
+            --bg: #f8fafc;
+            --text: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            background: #1e293b;
+            color: white;
+            width: 100%;
+            padding: 1.5rem 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        header h1 { margin: 0; font-size: 1.8rem; }
+        header p { margin: 5px 0 0; opacity: 0.8; }
+
+        .container {
+            max-width: 1200px;
+            width: 95%;
+            margin: 20px auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        /* Panel de Controles */
+        .controls-panel {
+            background: #f1f5f9;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #64748b;
+        }
+
+        .formula-input-wrapper {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding-left: 10px;
+        }
+
+        .formula-prefix {
+            font-family: monospace;
+            font-weight: bold;
+            color: #1e293b;
+            margin-right: 5px;
+        }
+
+        input {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            width: 100%;
+            outline: none;
+        }
+
+        input[type="number"] {
+            border: 1px solid #cbd5e1;
+        }
+
+        button#update-btn {
+            padding: 10px 24px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background 0.2s;
+            height: 42px;
+        }
+
+        button#update-btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        .error-container {
+            color: #ef4444;
+            background: #fee2e2;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+            font-size: 0.9rem;
+            border: 1px solid #fecaca;
+        }
+
+        /* Zona de Gráficos */
+        .plots-container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 20px;
+            margin-bottom: 2rem;
+        }
+
+        .plot-wrapper {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .plot-header {
+            background: #f8fafc;
+            padding: 10px 15px;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+
+        #phase-line-plot, #time-series-plot {
+            width: 100%;
+            height: 500px;
+        }
+
+        /* Sección de Resultados y Teoría */
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            border-top: 2px solid #f1f5f9;
+            padding-top: 2rem;
+        }
+
+        .results-card, .theory-card {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        h3 { margin-top: 0; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+
+        .equilibrium-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .equilibrium-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            border-left-width: 4px;
+        }
+
+        .eq-value { font-family: monospace; font-weight: bold; font-size: 1.1rem; }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .theory-card p { line-height: 1.6; margin-bottom: 10px; }
+        .theory-card ul { padding-left: 20px; }
+        .theory-card li { margin-bottom: 8px; }
+
+        @media (max-width: 900px) {
+            .controls-grid { grid-template-columns: 1fr 1fr; }
+            button#update-btn { grid-column: span 2; }
+            .plots-container { grid-template-columns: 1fr; }
+            #phase-line-plot { height: 300px; }
+            .info-section { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Diagrama de Fase y Evolución Temporal</h1>
+    <p>Análisis de la ecuación diferencial autónoma dy/dt = f(y)</p>
+</header>
+
+<div class="container">
+    
+    <div class="controls-panel">
+        <div class="controls-grid">
+            <div class="input-group">
+                <label for="equation">Función f(y):</label>
+                <div class="formula-input-wrapper">
+                    <span class="formula-prefix">dy/dt =</span>
+                    <input type="text" id="equation" value="y * (1 - y)" placeholder="ej. y^2 - 1">
+                </div>
+            </div>
+            <div class="input-group">
+                <label for="ymin">y Mínimo:</label>
+                <input type="number" id="ymin" value="-1" step="0.5">
+            </div>
+            <div class="input-group">
+                <label for="ymax">y Máximo:</label>
+                <input type="number" id="ymax" value="2" step="0.5">
+            </div>
+            <button id="update-btn" onclick="updateAll()">Actualizar</button>
+        </div>
+        <div id="error-msg" class="error-container"></div>
+    </div>
+
+    <div class="plots-container">
+        <div class="plot-wrapper">
+            <div class="plot-header">Línea de Fase (Eje y Vertical)</div>
+            <div id="phase-line-plot"></div>
+        </div>
+        
+        <div class="plot-wrapper">
+            <div class="plot-header">Evolución Temporal y vs t</div>
+            <div id="time-series-plot"></div>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="results-card">
+            <h3>Puntos de Equilibrio Detectados</h3>
+            <div id="equilibria-results">
+                </div>
+        </div>
+
+        <div class="theory-card">
+            <h3>Repaso Teórico</h3>
+            <p>Dada la ecuación autónoma <strong>dy/dt = f(y)</strong>:</p>
+            <ul>
+                <li>Los <strong>Puntos de Equilibrio</strong> son los valores de <i>y</i> donde la tasa de cambio es cero: <strong>f(y) = 0</strong>. Si la solución empieza ahí, permanece ahí para siempre.</li>
+                <li><strong>Estabilidad Asintótica (Atractor)</strong> <span class="badge" style="background:var(--stable)">Estable</span>: Las soluciones cercanas convergen al punto cuando t → ∞. Ocurre si f(y) > 0 a la izquierda y f(y) < 0 a la derecha.</li>
+                <li><strong>Inestabilidad (Repulsor)</strong> <span class="badge" style="background:var(--unstable)">Inestable</span>: Las soluciones cercanas se alejan. Ocurre si f(y) < 0 a la izquierda y f(y) > 0 a la derecha.</li>
+                <li><strong>Semiestabilidad (Nodo)</strong> <span class="badge" style="background:var(--semi)">Semiestable</span>: Atrae de un lado y repele del otro.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Configuraciones globales de estilo para Plotly
+    const plotlyConfig = { displayModeBar: false, responsive: true };
+    const fontStyle = { family: "'Segoe UI', sans-serif", size: 12, color: '#475569' };
+
+    // Función principal de actualización
+    function updateAll() {
+        const exprStr = document.getElementById('equation').value;
+        const yMin = parseFloat(document.getElementById('ymin').value);
+        const yMax = parseFloat(document.getElementById('ymax').value);
+        const errorDiv = document.getElementById('error-msg');
+
+        try {
+            // 1. Parsear la función
+            const node = math.parse(exprStr);
+            const fCode = node.compile();
+            const f = (yVal) => fCode.evaluate({y: yVal});
+            
+            // Test de evaluación para capturar errores de sintaxis temprano
+            f(yMin); 
+            
+            errorDiv.style.display = 'none';
+            
+            // 2. Cálculos numéricos
+            const equilibria = findEquilibria(f, yMin, yMax);
+            
+            // 3. Renderizar gráficos y texto
+            drawVerticalPhaseLine(equilibria, yMin, yMax);
+            drawTimeSeriesPlot(f, equilibria, yMin, yMax);
+            updateEquilibriaUI(equilibria);
+            
+        } catch (err) {
+            console.error(err);
+            errorDiv.style.display = 'block';
+            errorDiv.innerHTML = `<strong>Error de sintaxis:</strong> No se pudo evaluar la función f(y). Asegúrate de usar 'y' como variable. <br><small>${err.message}</small>`;
+            
+            // Limpiar gráficos en caso de error
+            Plotly.purge('phase-line-plot');
+            Plotly.purge('time-series-plot');
+            document.getElementById('equilibria-results').innerHTML = '';
+        }
+    }
+
+    /**
+     * ENCONTRAR PUNTOS DE EQUILIBRIO
+     * Escanea el rango y refina raíces usando bisección.
+     */
+    function findEquilibria(f, min, max) {
+        const steps = 1000; // Alta resolución para detección
+        const stepSize = (max - min) / steps;
+        let roots = [];
+
+        for (let i = 0; i < steps; i++) {
+            let y1 = min + i * stepSize;
+            let y2 = y1 + stepSize;
+            
+            let v1, v2;
+            try { v1 = f(y1); v2 = f(y2); } catch(e) { continue; }
+
+            // Detectar cambio de signo o cero exacto
+            if (v1 * v2 <= 0) {
+                // Refinamiento por bisección (robusto)
+                let ay = y1, by = y2;
+                for(let r=0; r<20; r++) {
+                    let mid = (ay + by) / 2;
+                    if (f(mid) * f(ay) < 0) by = mid;
+                    else ay = mid;
+                }
+                let rootY = (ay + by) / 2;
+                
+                // Evitar duplicados
+                if (!roots.some(r => Math.abs(r.y - rootY) < 1e-4)) {
+                    roots.push({
+                        y: rootY,
+                        stability: determineStability(f, rootY)
+                    });
+                }
+            }
+        }
+        // Ordenar de abajo hacia arriba
+        return roots.sort((a, b) => a.y - b.y);
+    }
+
+    function determineStability(f, yStar) {
+        const eps = 1e-4;
+        let fLeft, fRight;
+        try {
+            fLeft = f(yStar - eps);
+            fRight = f(yStar + eps);
+        } catch(e) { return 'Indeterminado'; }
+
+        if (fLeft > 0 && fRight < 0) return 'Estable';
+        if (fLeft < 0 && fRight > 0) return 'Inestable';
+        if (fLeft * fRight > 0) return 'Semiestable';
+        return 'Indeterminado';
+    }
+
+    /**
+     * GRÁFICO 1: LÍNEA DE FASE VERTICAL
+     */
+    function drawVerticalPhaseLine(equilibria, yMin, yMax) {
+        const traces = [];
+
+        // 1. Eje vertical principal (y)
+        traces.push({
+            x: [0, 0], y: [yMin, yMax],
+            mode: 'lines',
+            line: {color: '#94a3b8', width: 3},
+            hoverinfo: 'none', showlegend: false
+        });
+
+        // 2. Flechas de flujo (Arriba / Abajo)
+        const arrowGap = (yMax - yMin) / 15;
+        // Definir regiones entre equilibrios para colocar flechas
+        let regions = [yMin];
+        equilibria.forEach(eq => regions.push(eq.y));
+        regions.push(yMax);
+
+        for (let i = 0; i < regions.length - 1; i++) {
+            let rMin = regions[i];
+            let rMax = regions[i+1];
+            if (Math.abs(rMax - rMin) < 1e-4) continue;
+
+            // Punto medio de la región para evaluar signo
+            let midY = (rMin + rMax) / 2;
+            let testVal = math.evaluate(document.getElementById('equation').value, {y: midY});
+            
+            if (Math.abs(testVal) < 1e-6) continue;
+
+            let direction = testVal > 0 ? 1 : -1;
+            let color = testVal > 0 ? varColor('--stable') : varColor('--unstable');
+            let symbol = testVal > 0 ? 'triangle-up' : 'triangle-down';
+
+            // Colocar una o dos flechas por región
+            let arrowPos = [midY];
+            if ((rMax - rMin) > arrowGap * 3) {
+                arrowPos = [rMin + (rMax-rMin)*0.33, rMin + (rMax-rMin)*0.66];
+            }
+
+            arrowPos.forEach(yP => {
+                traces.push({
+                    x: [0], y: [yP],
+                    mode: 'markers',
+                    marker: { symbol: symbol, size: 14, color: color, line: {color: 'white', width: 1} },
+                    hoverinfo: 'text', text: `Región dy/dt ${testVal > 0 ? '>' : '<'} 0`,
+                    showlegend: false
+                });
+            });
+        }
+
+        // 3. Puntos de Equilibrio
+        equilibria.forEach(eq => {
+            let symbol, color;
+            switch(eq.stability) {
+                case 'Estable': symbol = 'circle'; color = 'black'; break;
+                case 'Inestable': symbol = 'circle-open'; color = 'black'; break;
+                default: symbol = 'diamond'; color = varColor('--semi');
+            }
+
+            traces.push({
+                x: [0], y: [eq.y],
+                mode: 'markers',
+                name: eq.stability,
+                marker: { symbol: symbol, size: 16, color: color, line: {width: 2, color: 'black'} },
+                hoverinfo: 'text', text: `Equilibrio ${eq.stability}<br>y = ${eq.y.toFixed(3)}`,
+                showlegend: false
+            });
+        });
+
+        const layout = {
+            margin: { l: 50, r: 20, t: 20, b: 40 },
+            xaxis: { visible: false, range: [-1, 1] },
+            yaxis: { title: 'Estado (y)', range: [yMin, yMax], zeroline: false, gridcolor: '#f1f5f9', titlefont: fontStyle, tickfont: fontStyle },
+            plot_bgcolor: 'white', paper_bgcolor: 'white'
+        };
+
+        Plotly.newPlot('phase-line-plot', traces, layout, plotlyConfig);
+    }
+
+    /**
+     * GRÁFICO 2: EVOLUCIÓN TEMPORAL (y vs t)
+     * Estilo similar a la imagen de ejemplo provista.
+     */
+    function drawTimeSeriesPlot(f, equilibria, yMin, yMax) {
+        const traces = [];
+        const tMax = 10;
+        const dt = 0.05;
+        const numSteps = tMax / dt;
+
+        // Estilos de línea
+        const eqLineStyle = { color: '#334155', width: 2, dash: 'solid' };
+        const solLineStyle = { color: '#94a3b8', width: 1.5 };
+
+        // 1. Dibujar líneas horizontales de equilibrio (asíntotas)
+        equilibria.forEach(eq => {
+            traces.push({
+                x: [0, tMax], y: [eq.y, eq.y],
+                mode: 'lines',
+                line: eqLineStyle,
+                hoverinfo: 'text', text: `Equilibrio y = ${eq.y.toFixed(2)}`,
+                showlegend: false
+            });
+        });
+
+        // 2. Generar curvas de solución (Integración numérica Euler simple es suficiente para visualización)
+        // Definir condiciones iniciales y0 espaciadas
+        let y0_values = [];
+        const padding = (yMax - yMin) * 0.1;
+        const gridMin = yMin + padding;
+        const gridMax = yMax - padding;
+        
+        // Regiones extremas
+        y0_values.push(gridMin, gridMax);
+        
+        // Entre equilibrios
+        if (equilibria.length === 0) {
+            for(let i=1; i<=5; i++) y0_values.push(yMin + i*(yMax-yMin)/6);
+        } else {
+            // Región por debajo del primer equilibrio
+            y0_values.push(regionsWithPadding(yMin, equilibria[0].y, 2));
+            // Regiones intermedias
+            for(let i=0; i<equilibria.length-1; i++) {
+                y0_values.push(regionsWithPadding(equilibria[i].y, equilibria[i+1].y, 3));
+            }
+            // Región por encima del último
+            y0_values.push(regionsWithPadding(equilibria[equilibria.length-1].y, yMax, 2));
+        }
+        y0_values = y0_values.flat().filter(y => y >= yMin && y <= yMax);
+
+        // Integrar y graficar cada solución
+        y0_values.forEach(y0 => {
+            let tArr = [0], yArr = [y0];
+            let currY = y0;
+            
+            for (let i = 0; i < numSteps; i++) {
+                let dy;
+                try { dy = f(currY); } catch(e) { break; }
+                
+                // Euler step
+                let nextY = currY + dy * dt;
+                
+                // Parar si sale mucho del rango o explota
+                if (isNaN(nextY) || Math.abs(nextY) > 1e4 || nextY < yMin - 1 || nextY > yMax + 1) break;
+                
+                currY = nextY;
+                tArr.push((i+1)*dt);
+                yArr.push(currY);
+                
+                // Optimización: parar si se acerca mucho a un equilibrio
+                if (equilibria.some(eq => Math.abs(currY - eq.y) < 1e-4)) break;
+            }
+
+            traces.push({
+                x: tArr, y: yArr,
+                mode: 'lines',
+                line: solLineStyle,
+                hoverinfo: 'none', showlegend: false
+            });
+        });
+
+        const layout = {
+            margin: { l: 50, r: 30, t: 20, b: 50 },
+            xaxis: { title: 'Tiempo (t)', showgrid: true, gridcolor: '#f1f5f9', zeroline: true, zerolinecolor: '#475569', titlefont: fontStyle, tickfont: fontStyle },
+            yaxis: { title: 'Estado (y)', range: [yMin, yMax], showgrid: true, gridcolor: '#f1f5f9', zeroline: false, titlefont: fontStyle, tickfont: fontStyle },
+            plot_bgcolor: 'white', paper_bgcolor: 'white'
+        };
+
+        Plotly.newPlot('time-series-plot', traces, layout, plotlyConfig);
+    }
+
+    // Helper para espaciar condiciones iniciales
+    function regionsWithPadding(start, end, n) {
+        let pts = [];
+        let span = end - start;
+        if (span < 1e-3) return pts;
+        let p = span * 0.15; // 15% padding interior
+        for(let i=1; i<=n; i++) pts.push(start + p + (i-1)*(span-2*p)/(n-1 || 1));
+        return pts;
+    }
+
+    /**
+     * ACTUALIZAR PANEL DE TEXTO DE RESULTADOS
+     */
+    function updateEquilibriaUI(equilibria) {
+        const container = document.getElementById('equilibria-results');
+        if (equilibria.length === 0) {
+            container.innerHTML = "<p style='color: #64748b; font-style: italic;'>No se detectaron puntos de equilibrio reales en el rango visualizado.</p>";
+            return;
+        }
+
+        let html = '<ul class="equilibrium-list">';
+        equilibria.forEach(eq => {
+            let color, text;
+            switch(eq.stability) {
+                case 'Estable': color = 'var(--stable)'; text = 'Estable (Atractor)'; break;
+                case 'Inestable': color = 'var(--unstable)'; text = 'Inestable (Repulsor)'; break;
+                case 'Semiestable': color = 'var(--semi)'; text = 'Semiestable'; break;
+                default: color = '#94a3b8'; text = eq.stability;
+            }
+            
+            html += `
+                <li class="equilibrium-item" style="border-left-color: ${color}">
+                    <span class="eq-value">y = ${eq.y.toFixed(5)}</span>
+                    <span class="badge" style="background:${color}">${text}</span>
+                </li>`;
+        });
+        html += '</ul>';
+        container.innerHTML = html;
+    }
+
+    // Helper para obtener variables CSS en JS
+    function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+    // Inicialización automática
+    window.onload = updateAll;
+</script>
+
+</body>
+</html>
